@@ -1,0 +1,11 @@
+name = "drone-zone-proxy"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# 배포 후 아래처럼 시크릿 등록:
+#   cd worker && npx wrangler secret put VWORLD_KEY
+# (필요시) 도메인 제한이 있는 V-World 키 대응용:
+#   npx wrangler secret put VWORLD_DOMAIN
+
+[vars]
+# 공개돼도 되는 기본값만

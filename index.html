@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>드론 비행 가능 구역 체커</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", sans-serif; }
+  #map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+  #status {
+    position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000;
+    padding: 14px 16px; border-radius: 12px; font-weight: 600; font-size: 15px;
+    background: #f2f4f7; color: #101828; box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    display: flex; align-items: center; gap: 10px; transition: background .2s;
+  }
+  #status.safe { background: #10b981; color: #fff; }
+  #status.danger { background: #ef4444; color: #fff; }
+  #status.warn  { background: #f59e0b; color: #fff; }
+  #status .dot { width: 12px; height: 12px; border-radius: 50%; background: currentColor; opacity: .9; }
+  #search {
+    position: absolute; top: 68px; left: 12px; right: 12px; z-index: 1000;
+    display: flex; gap: 6px;
+  }
+  #search input {
+    flex: 1; padding: 12px 14px; border: 0; border-radius: 10px; font-size: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15); background: #fff; outline: none;
+  }
+  #search button {
+    padding: 0 16px; border: 0; border-radius: 10px; background: #111827; color: #fff;
+    font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  #results {
+    position: absolute; top: 120px; left: 12px; right: 12px; z-index: 1000;
+    background: #fff; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    max-height: 40vh; overflow: auto; display: none;
+  }
+  #results .item {
+    padding: 12px 14px; border-bottom: 1px solid #eef; cursor: pointer; font-size: 14px;
+  }
+  #results .item:hover { background: #f8fafc; }
+  #results .item:last-child { border-bottom: 0; }
+  #results .item .sub { color: #64748b; font-size: 12px; margin-top: 2px; }
+  #controls {
+    position: absolute; bottom: 20px; left: 12px; right: 12px; z-index: 1000;
+    display: flex; gap: 8px; justify-content: center;
+  }
+  #controls button {
+    padding: 12px 18px; border: 0; border-radius: 10px; font-weight: 600; font-size: 14px;
+    background: #111827; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer;
+  }
+  #controls button.ghost { background: #fff; color: #111827; }
+  .legend {
+    position: absolute; bottom: 80px; right: 12px; z-index: 1000;
+    background: #fff; padding: 10px 12px; border-radius: 10px; font-size: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .legend .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 3px; }
+  .legend #data-source { margin-top: 6px; padding-top: 6px; border-top: 1px solid #eef; color: #64748b; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="status"><span class="dot"></span><span id="status-text">위치 확인 중…</span></div>
+<div id="search">
+  <input id="q" type="text" placeholder="장소 검색 (예: 한강공원 여의도, 남산타워)" autocomplete="off" />
+  <button id="q-go">검색</button>
+</div>
+<div id="results"></div>
+<div id="map"></div>
+<div class="legend">
+  <div class="row"><div class="swatch" style="background:#ef4444;"></div>비행금지구역</div>
+  <div class="row"><div class="swatch" style="background:#f59e0b;"></div>비행제한/관제권</div>
+  <div class="row"><div class="swatch" style="background:#3b82f6;"></div>내 위치</div>
+  <div id="data-source">데이터 로딩…</div>
+</div>
+<div id="controls">
+  <button id="locate">📍 내 위치</button>
+  <button id="simulate" class="ghost">🧪 위치 시뮬레이션</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // Cloudflare Worker 배포 후 아래 URL 넣으세요.
+  // 비어있으면 zones.js 내장 샘플 데이터 사용.
+  window.ZONES_PROXY_URL = ""; // 예: "https://drone-zone-proxy.<username>.workers.dev"
+</script>
+<script src="zones.js"></script>
+<script>
+  const map = L.map('map', { zoomControl: true }).setView([36.5, 127.8], 7);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  // TODO: V-World 타일 붙이려면 API 키 발급 후 아래 주석 해제
+  // const VWORLD_KEY = 'YOUR_KEY';
+  // L.tileLayer(`https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Base/{z}/{y}/{x}.png`, {
+  //   maxZoom: 19, attribution: 'V-World'
+  // }).addTo(map);
+
+  const styleFor = (feature) => {
+    const kind = feature.properties.kind;
+    if (kind === 'prohibited') return { color: '#ef4444', weight: 2, fillColor: '#ef4444', fillOpacity: 0.35 };
+    if (kind === 'restricted') return { color: '#f59e0b', weight: 2, fillColor: '#f59e0b', fillOpacity: 0.25 };
+    return { color: '#6b7280', weight: 1, fillOpacity: 0.15 };
+  };
+
+  let zoneLayer = L.geoJSON(window.ZONES, {
+    style: styleFor,
+    onEachFeature: (f, layer) => {
+      layer.bindPopup(`<b>${f.properties.name}</b><br>${f.properties.desc || ''}`);
+    }
+  }).addTo(map);
+
+  // Worker에서 실데이터 도착 시 레이어 교체
+  window.addEventListener('zones:loaded', (e) => {
+    map.removeLayer(zoneLayer);
+    zoneLayer = L.geoJSON(window.ZONES, {
+      style: styleFor,
+      onEachFeature: (f, layer) => layer.bindPopup(`<b>${f.properties.name}</b><br>${f.properties.desc || ''}`)
+    }).addTo(map);
+    const src = e.detail?.source;
+    const cnt = window.ZONES.features.length;
+    const badge = document.getElementById('data-source');
+    if (badge) badge.textContent = src === 'network' ? `실데이터 ${cnt}개` : src === 'cache' ? `캐시 ${cnt}개` : `샘플 ${cnt}개`;
+    // 현재 위치가 있으면 재판정
+    if (meMarker) {
+      const ll = meMarker.getLatLng();
+      updateStatus(ll.lat, ll.lng);
+    }
+  });
+
+  // ---- 위치 → 구역 판정 ----
+  let meMarker = null;
+  let meCircle = null;
+
+  function pointInRing([x, y], ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+  function pointInPolygon(pt, geom) {
+    const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates;
+    for (const poly of polys) {
+      if (!pointInRing(pt, poly[0])) continue;
+      let inHole = false;
+      for (let h = 1; h < poly.length; h++) if (pointInRing(pt, poly[h])) inHole = true;
+      if (!inHole) return true;
+    }
+    return false;
+  }
+
+  function updateStatus(lat, lng) {
+    const el = document.getElementById('status');
+    const txt = document.getElementById('status-text');
+    const hits = ZONES.features.filter(f => pointInPolygon([lng, lat], f.geometry));
+    el.classList.remove('safe', 'danger', 'warn');
+
+    if (hits.some(h => h.properties.kind === 'prohibited')) {
+      el.classList.add('danger');
+      txt.textContent = `🚫 비행금지구역: ${hits.filter(h=>h.properties.kind==='prohibited').map(h=>h.properties.name).join(', ')}`;
+    } else if (hits.some(h => h.properties.kind === 'restricted')) {
+      el.classList.add('warn');
+      txt.textContent = `⚠️ 비행제한구역: ${hits.filter(h=>h.properties.kind==='restricted').map(h=>h.properties.name).join(', ')}`;
+    } else {
+      el.classList.add('safe');
+      txt.textContent = '✅ 비행 가능 구역으로 판단됩니다 (샘플 데이터 기준)';
+    }
+  }
+
+  function setMe(lat, lng, accuracy) {
+    const latlng = [lat, lng];
+    if (!meMarker) {
+      meMarker = L.circleMarker(latlng, { radius: 8, color: '#fff', weight: 2, fillColor: '#3b82f6', fillOpacity: 1 }).addTo(map);
+    } else meMarker.setLatLng(latlng);
+    if (accuracy) {
+      if (!meCircle) meCircle = L.circle(latlng, { radius: accuracy, color: '#3b82f6', fillOpacity: 0.1, weight: 1 }).addTo(map);
+      else meCircle.setLatLng(latlng).setRadius(accuracy);
+    }
+    updateStatus(lat, lng);
+  }
+
+  // ---- Geolocation ----
+  function startWatch() {
+    if (!navigator.geolocation) {
+      document.getElementById('status-text').textContent = '이 브라우저는 위치 정보를 지원하지 않아요.';
+      return;
+    }
+    navigator.geolocation.watchPosition(
+      pos => {
+        setMe(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+        map.setView([pos.coords.latitude, pos.coords.longitude], Math.max(map.getZoom(), 13));
+      },
+      err => {
+        document.getElementById('status-text').textContent = `위치 오류: ${err.message}`;
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+  }
+
+  document.getElementById('locate').addEventListener('click', startWatch);
+
+  // 시뮬레이션: 지도 클릭 지점을 내 위치로 취급
+  let simMode = false;
+  document.getElementById('simulate').addEventListener('click', () => {
+    simMode = !simMode;
+    document.getElementById('simulate').textContent = simMode ? '🧪 시뮬레이션 ON (지도 클릭)' : '🧪 위치 시뮬레이션';
+  });
+  map.on('click', (e) => { if (simMode) setMe(e.latlng.lat, e.latlng.lng, 20); });
+
+  // ---- 지명 검색 (Nominatim) + 구역 판정 ----
+  let searchMarker = null;
+
+  function zoneVerdict(lat, lng) {
+    const hits = ZONES.features.filter(f => pointInPolygon([lng, lat], f.geometry));
+    const prohibited = hits.filter(h => h.properties.kind === 'prohibited');
+    const restricted = hits.filter(h => h.properties.kind === 'restricted');
+    if (prohibited.length) {
+      return {
+        level: 'danger',
+        icon: '🚫',
+        title: '비행금지구역',
+        color: '#ef4444',
+        names: prohibited.map(h => h.properties.name)
+      };
+    }
+    if (restricted.length) {
+      return {
+        level: 'warn',
+        icon: '⚠️',
+        title: '비행제한구역',
+        color: '#f59e0b',
+        names: restricted.map(h => h.properties.name)
+      };
+    }
+    return { level: 'safe', icon: '✅', title: '비행 가능 구역', color: '#10b981', names: [] };
+  }
+
+  function showSearchResult(lat, lng, label) {
+    if (searchMarker) map.removeLayer(searchMarker);
+    const v = zoneVerdict(lat, lng);
+    searchMarker = L.marker([lat, lng]).addTo(map);
+    const body = v.names.length
+      ? `<div style="margin-top:6px;font-size:12px;color:#475569;">해당 구역: ${v.names.join(', ')}</div>`
+      : `<div style="margin-top:6px;font-size:12px;color:#475569;">샘플 데이터 기준 알려진 금지/제한 구역에 포함되지 않음</div>`;
+    const html = `
+      <div style="min-width:200px">
+        <div style="font-weight:600;margin-bottom:4px;">${label}</div>
+        <div style="display:inline-block;padding:4px 8px;border-radius:6px;color:#fff;background:${v.color};font-weight:600;font-size:13px;">
+          ${v.icon} ${v.title}
+        </div>
+        ${body}
+        <div style="margin-top:8px;font-size:11px;color:#94a3b8;">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+      </div>`;
+    searchMarker.bindPopup(html, { maxWidth: 280 }).openPopup();
+    map.setView([lat, lng], Math.max(map.getZoom(), 14));
+  }
+
+  async function runSearch(q) {
+    const box = document.getElementById('results');
+    if (!q.trim()) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    box.innerHTML = `<div class="item">검색 중…</div>`;
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=ko&countrycodes=kr&q=${encodeURIComponent(q)}`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const data = await res.json();
+      if (!data.length) {
+        box.innerHTML = `<div class="item">검색 결과가 없어요. 다른 키워드로 시도해보세요.</div>`;
+        return;
+      }
+      box.innerHTML = data.map((r, i) => {
+        const v = zoneVerdict(parseFloat(r.lat), parseFloat(r.lon));
+        return `
+          <div class="item" data-idx="${i}">
+            <div>
+              <span style="display:inline-block;padding:2px 8px;border-radius:6px;color:#fff;background:${v.color};font-size:12px;font-weight:600;margin-right:6px;">
+                ${v.icon} ${v.title}
+              </span>
+              ${r.display_name.split(',').slice(0, 2).join(',')}
+            </div>
+            <div class="sub">${r.display_name}</div>
+          </div>`;
+      }).join('');
+      box.querySelectorAll('.item').forEach(el => {
+        el.addEventListener('click', () => {
+          const r = data[parseInt(el.dataset.idx)];
+          showSearchResult(parseFloat(r.lat), parseFloat(r.lon), r.display_name.split(',')[0]);
+          box.style.display = 'none';
+        });
+      });
+    } catch (e) {
+      box.innerHTML = `<div class="item">검색 오류: ${e.message}</div>`;
+    }
+  }
+
+  document.getElementById('q-go').addEventListener('click', () => runSearch(document.getElementById('q').value));
+  document.getElementById('q').addEventListener('keydown', e => {
+    if (e.key === 'Enter') runSearch(e.target.value);
+  });
+  // 지도 클릭 시 결과 리스트 닫기
+  map.on('click', () => { document.getElementById('results').style.display = 'none'; });
+
+  // 처음 로드 시 자동으로 위치 요청
+  startWatch();
+</script>
+</body>
+</html>

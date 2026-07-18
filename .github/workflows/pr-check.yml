@@ -1,0 +1,21 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: HTML/JS 문법 체크
+        run: |
+          sudo apt-get install -y tidy
+          tidy -q -e index.html || true
+          node --check zones.js
+      - name: 빠진 파일 확인
+        run: |
+          test -f index.html
+          test -f zones.js
+          echo "✅ 필수 파일 OK"
