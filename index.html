@@ -116,6 +116,65 @@
   }
   #cl-reset { background: #f1f5f9; color: #475569; }
   #cl-onestop { background: #111827; color: #fff; }
+
+  /* ===== 초보자 팁 패널 (좌측 고정, 모바일에서는 접힘) ===== */
+  #tips {
+    position: absolute; left: 12px; top: 130px; bottom: 90px; width: 300px;
+    background: #fff; border-radius: 14px; z-index: 900;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    display: flex; flex-direction: column; overflow: hidden;
+    transition: transform .25s ease, opacity .25s ease;
+  }
+  #tips header {
+    padding: 14px 16px 10px; border-bottom: 1px solid #eef;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #tips header .title { font-weight: 700; font-size: 15px; flex: 1; }
+  #tips header button {
+    border: 0; background: transparent; font-size: 18px; cursor: pointer;
+    color: #64748b; padding: 4px 6px;
+  }
+  #tips .body { overflow: auto; padding: 12px 16px 16px; font-size: 13px; line-height: 1.5; }
+  #tips section { margin-bottom: 16px; }
+  #tips section:last-child { margin-bottom: 4px; }
+  #tips h4 {
+    margin: 0 0 6px; font-size: 13px; color: #0f172a;
+    display: flex; align-items: center; gap: 6px;
+  }
+  #tips ul { margin: 0; padding-left: 4px; list-style: none; }
+  #tips li {
+    padding: 5px 0 5px 20px; position: relative; color: #334155;
+  }
+  #tips li::before {
+    content: '·'; position: absolute; left: 6px; top: 0;
+    color: #94a3b8; font-weight: 700; font-size: 16px;
+  }
+  #tips li b { color: #0f172a; }
+  #tips .tag {
+    display: inline-block; padding: 1px 6px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; margin-right: 4px;
+  }
+  #tips .tag.warn   { background: #fef3c7; color: #92400e; }
+  #tips .tag.danger { background: #fee2e2; color: #991b1b; }
+  #tips .tag.ok     { background: #d1fae5; color: #065f46; }
+
+  /* 모바일에서는 좌측 패널 숨기고 토글 버튼으로 */
+  #tips-toggle {
+    position: absolute; left: 12px; bottom: 78px; z-index: 1001;
+    width: 52px; height: 52px; border-radius: 50%; border: 0;
+    background: #fff; color: #111827; font-size: 22px; cursor: pointer;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.2); display: none;
+  }
+  @media (max-width: 900px) {
+    #tips {
+      left: 12px; right: 12px; top: 130px; bottom: 90px; width: auto;
+      transform: translateY(calc(100% + 20px)); opacity: 0; pointer-events: none;
+    }
+    #tips.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+    #tips-toggle { display: block; }
+    /* 모바일에서 검색 결과가 팁 위로 잘 뜨도록 */
+    #results { z-index: 950; }
+  }
 </style>
 </head>
 <body>
@@ -137,6 +196,69 @@
   <button id="simulate" class="ghost">🧪 위치 시뮬레이션</button>
 </div>
 
+<aside id="tips" aria-label="초보자 팁">
+  <header>
+    <span class="title">💡 초보자 팁 & 주의사항</span>
+    <button id="tips-close" aria-label="닫기">✕</button>
+  </header>
+  <div class="body">
+
+    <section>
+      <h4>🎯 꼭 알아야 할 5가지</h4>
+      <ul>
+        <li>토이 드론(<b>250g 이하</b>)도 <b>비행공역·고도 규정은 동일</b> 적용</li>
+        <li>장치 신고·자격증은 면제, 하지만 <b>위반 시 과태료 최대 300만원</b></li>
+        <li>야간(일몰~일출) 비행은 <span class="tag warn">신청</span> 무조건 필요</li>
+        <li>사람·차량 위 비행 <span class="tag danger">절대 금지</span></li>
+        <li>150m 초과 고도 <span class="tag warn">사전 승인</span> 필요</li>
+      </ul>
+    </section>
+
+    <section>
+      <h4>🚁 첫 비행 팁</h4>
+      <ul>
+        <li>실외 <b>개활지</b>에서 시작 (공원·하천변 추천)</li>
+        <li>배터리 <b>30% 남으면 즉시 착륙</b> — 급강하 예방</li>
+        <li>처음엔 <b>5m 이내</b> 근거리 조종 연습부터</li>
+        <li>바람 없는 <b>오전</b> 시간대에 (오후엔 상승기류)</li>
+        <li>이륙 전 <b>GPS 잠금</b> 확인 (홈 위치 자동 저장)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h4>⚠️ 자주 놓치는 규정</h4>
+      <ul>
+        <li>관제권 <b>반경 9.3km</b> — 인천공항 근처면 강화도까지</li>
+        <li>청와대·용산 대통령실 반경은 <span class="tag danger">무조건 금지</span></li>
+        <li>국립공원 내 대부분 지역 비행 <span class="tag warn">제한</span></li>
+        <li>학교·병원·고속도로 상공은 피할 것</li>
+        <li>사고·재난 현장 상공 촬영 <span class="tag danger">금지</span></li>
+      </ul>
+    </section>
+
+    <section>
+      <h4>🆘 응급 상황 대처</h4>
+      <ul>
+        <li>신호 끊김 → 대부분 <b>자동 홈 복귀(RTH)</b> 작동</li>
+        <li>배터리 경고 알림 → <b>가까운 개활지에 즉시 착륙</b></li>
+        <li>새 접근 → <b>저공 비행</b>으로 회피, 급회전 X</li>
+        <li>드론 실종 → <b>마지막 위치·시간 기록</b> 후 경찰 신고</li>
+      </ul>
+    </section>
+
+    <section>
+      <h4>📞 문의처</h4>
+      <ul>
+        <li>드론 원스톱 민원: <a href="https://drone.onestop.go.kr" target="_blank" rel="noopener">drone.onestop.go.kr</a></li>
+        <li>항공교통센터: <b>044-201-4290</b></li>
+        <li>불법 드론 신고: <b>117</b> (경찰)</li>
+      </ul>
+    </section>
+
+  </div>
+</aside>
+
+<button id="tips-toggle" title="초보자 팁">💡</button>
 <button id="cl-open" title="비행 전 체크리스트">✈️</button>
 <div id="cl-backdrop"></div>
 <aside id="cl-sheet" aria-label="비행 전 체크리스트">
@@ -390,6 +512,11 @@
 
   // 처음 로드 시 자동으로 위치 요청
   startWatch();
+
+  // 초보자 팁 패널 토글 (모바일에서만 의미 있음)
+  const tips = document.getElementById('tips');
+  document.getElementById('tips-toggle').addEventListener('click', () => tips.classList.toggle('open'));
+  document.getElementById('tips-close').addEventListener('click', () => tips.classList.remove('open'));
 </script>
 <script src="checklist.js"></script>
 </body>
