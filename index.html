@@ -151,6 +151,13 @@
   .spot-marker::before { content: ''; transform: rotate(45deg); font-size: 18px; }
   .spot-marker { font-size: 0; }
   .spot-marker > * { transform: rotate(45deg); font-size: 16px; }
+  .spot-marker.community { background: #6366f1; }  /* 커뮤니티는 인디고 */
+  .spot-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; margin: 4px 0;
+  }
+  .spot-badge.community { background: #eef2ff; color: #4338ca; }
+  .spot-badge.personal { background: #fdf2f8; color: #be185d; }
   .spot-star {
     position: absolute; top: -8px; right: -8px; font-size: 12px;
     transform: rotate(45deg);
@@ -306,6 +313,12 @@
   <div class="row"><div class="swatch" style="background:#ef4444;"></div>비행금지구역</div>
   <div class="row"><div class="swatch" style="background:#f59e0b;"></div>비행제한/관제권</div>
   <div class="row"><div class="swatch" style="background:#3b82f6;"></div>내 위치</div>
+  <div class="row"><div class="swatch" style="background:#ec4899;"></div>내 스팟</div>
+  <div class="row"><div class="swatch" style="background:#6366f1;"></div>커뮤니티 스팟</div>
+  <label class="row" style="cursor:pointer;">
+    <input id="show-community" type="checkbox" checked style="width:14px;height:14px;accent-color:#6366f1;" />
+    커뮤니티 표시
+  </label>
   <div id="data-source">데이터 로딩…</div>
 </div>
 <div id="controls">
@@ -402,9 +415,26 @@
   <label for="spot-desc">메모 (선택)</label>
   <textarea id="spot-desc" placeholder="촬영 팁, 최적 시간대, 주차 정보 등" maxlength="500"></textarea>
 
-  <label for="spot-photo">사진 (선택)</label>
-  <input id="spot-photo" type="file" accept="image/*" />
-  <div id="spot-photo-preview"></div>
+  <div id="spot-photo-row">
+    <label for="spot-photo">사진 (선택)</label>
+    <input id="spot-photo" type="file" accept="image/*" />
+    <div id="spot-photo-preview"></div>
+  </div>
+
+  <label class="spot-share-row" style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;font-weight:600;color:#334155;">
+    <input id="spot-share" type="checkbox" style="width:18px;height:18px;accent-color:#ec4899;" />
+    커뮤니티에 공유 (모든 사용자에게 보임)
+  </label>
+  <div id="spot-share-hint" style="display:none;font-size:12px;color:#64748b;margin-top:4px;line-height:1.5;">
+    · 공유 스팟은 다른 사용자에게도 표시돼요<br>
+    · 사진은 공유되지 않고, 이름·별점·메모만 저장됩니다<br>
+    · 신고 3회 누적 시 자동 숨김
+  </div>
+
+  <div id="spot-nickname-row" style="display:none;">
+    <label for="spot-author-name">닉네임 (선택)</label>
+    <input id="spot-author-name" type="text" placeholder="비워두면 '익명'" maxlength="30" />
+  </div>
 
   <div id="spot-form-warn"></div>
 
