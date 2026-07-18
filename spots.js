@@ -187,25 +187,30 @@ function renderSpotList() {
   const el = document.getElementById('spot-list');
   if (!el) return;
 
-  // 개인 스팟 + 내가 올린 커뮤니티 스팟을 합쳐서 표시
+  // 개인 스팟 (localStorage) + 커뮤니티 전체
   const myIds = loadMyCommunityIds();
-  const personal = loadSpots().map(s => ({ ...s, _kind: 'personal', _sortKey: s.createdAt }));
+  const personal = loadSpots().map(s => ({ ...s, _kind: 'personal', _sortKey: s.createdAt, _mine: true }));
   const community = communitySpotsCache
-    .filter(s => myIds.includes(s.id))
-    .map(s => ({ ...s, _kind: 'community', _sortKey: s.created_at }));
+    .map(s => ({ ...s, _kind: 'community', _sortKey: s.created_at, _mine: myIds.includes(s.id) }));
 
   const spots = [...personal, ...community]
     .sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b._sortKey || '').localeCompare(a._sortKey || ''));
 
   if (!spots.length) {
-    el.innerHTML = `<div class="spot-empty">저장된 스팟이 없어요.<br>지도에서 📸 버튼을 누르고 위치를 찍어보세요.</div>`;
+    el.innerHTML = `<div class="spot-empty">아직 등록된 스팟이 없어요.<br>지도에서 📸 버튼을 누르고 위치를 찍어보세요.</div>`;
     return;
   }
   el.innerHTML = spots.map(s => {
     const dateStr = s._sortKey ? new Date(s._sortKey).toLocaleDateString('ko-KR') : '';
-    const kindBadge = s._kind === 'community'
-      ? '<span class="spot-row-kind community">👥 공유</span>'
-      : '<span class="spot-row-kind personal">🔒 개인</span>';
+    let kindBadge;
+    if (s._kind === 'community') {
+      kindBadge = s._mine
+        ? '<span class="spot-row-kind mine">👤 내가 등록</span>'
+        : `<span class="spot-row-kind community">👥 ${escapeHtml(s.author_name || '익명')}</span>`;
+    } else {
+      kindBadge = '<span class="spot-row-kind personal">🔒 개인(로컬)</span>';
+    }
+    const canDelete = s._kind === 'personal' || s._mine;
     return `
       <div class="spot-row" data-id="${s.id}" data-kind="${s._kind}">
         ${s.photo ? `<img src="${s.photo}" class="spot-thumb">` : `<div class="spot-thumb-blank">📸</div>`}
@@ -213,7 +218,10 @@ function renderSpotList() {
           <div class="spot-row-name">${escapeHtml(s.name)}</div>
           <div class="spot-row-sub">${kindBadge} ${s.rating ? '⭐'.repeat(s.rating) : ''} · ${dateStr}</div>
         </div>
-        <button class="spot-row-del" data-action="row-delete" data-id="${s.id}" data-kind="${s._kind}" title="삭제">🗑️</button>
+        ${canDelete
+          ? `<button class="spot-row-del" data-action="row-delete" data-id="${s.id}" data-kind="${s._kind}" title="삭제">🗑️</button>`
+          : `<button class="spot-row-del" data-action="row-report" data-id="${s.id}" title="신고">🚩</button>`
+        }
       </div>`;
   }).join('');
 
@@ -424,6 +432,26 @@ window.addEventListener('DOMContentLoaded', () => {
       const label = save.dataset.label || '';
       if (window.mapRef) window.mapRef.closePopup();
       openSpotForm(lat, lng, label);
+      return;
+    }
+
+    const rowReport = e.target.closest('[data-action="row-report"]');
+    if (rowReport) {
+      e.stopPropagation();
+      const id = rowReport.dataset.id;
+      if (!confirm('이 스팟을 신고할까요? 신고가 누적되면 자동으로 숨겨집니다.')) return;
+      try {
+        const base = window.ZONES_PROXY_URL;
+        const res = await fetch(`${base.replace(/\/$/, '')}/spots/${encodeURIComponent(id)}/report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: getAuthorToken() }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+        const data = await res.json();
+        alert(data.hidden ? '신고 3회 누적 → 자동 숨김 처리됐어요' : `신고 접수 (총 ${data.reports}회)`);
+        if (data.hidden) await fetchCommunitySpots();
+      } catch (err) { alert('신고 실패: ' + err.message); }
       return;
     }
 
