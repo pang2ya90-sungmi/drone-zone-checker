@@ -396,7 +396,7 @@
 </head>
 <body>
 <div id="status"><span class="dot"></span><span id="status-text">위치 확인 중…</span></div>
-<button id="refresh-btn" title="서버에서 다시 불러오기">🔄</button>
+<button id="refresh-btn" title="앱 새로고침 (최신 버전으로)">🔄</button>
 <div id="toast"></div>
 <div id="search">
   <input id="q" type="text" placeholder="장소 검색 (예: 한강공원 여의도, 남산타워)" autocomplete="off" />
@@ -879,20 +879,15 @@
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 1800);
   }
-  document.getElementById('refresh-btn').addEventListener('click', async () => {
+  document.getElementById('refresh-btn').addEventListener('click', () => {
     const btn = document.getElementById('refresh-btn');
     btn.classList.add('spin');
     btn.disabled = true;
-    try {
-      if (typeof fetchCommunitySpots === 'function') await fetchCommunitySpots();
-      // TODO: V-World 활성화되면 zones도 refetch
-      toast('✅ 최신 데이터로 업데이트했어요');
-    } catch (e) {
-      toast('⚠️ 새로고침 실패: ' + e.message);
-    } finally {
-      btn.classList.remove('spin');
-      btn.disabled = false;
-    }
+    toast('앱을 새로고침하는 중…');
+    // 캐시 우회를 위해 쿼리 파라미터로 timestamp 추가 → 즉시 리로드
+    const url = new URL(location.href);
+    url.searchParams.set('t', Date.now());
+    setTimeout(() => location.replace(url.toString()), 300);
   });
 
   // 초보자 팁 패널 토글 (모바일에서만 의미 있음)
