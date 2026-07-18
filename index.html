@@ -4,6 +4,16 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 <title>드론 비행 가능 구역 체커</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#ec4899" />
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="드론체커" />
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   * { box-sizing: border-box; }
@@ -251,6 +261,55 @@
     align-self: center;
   }
   .spot-row-del:hover { background: #fef2f2; color: #b91c1c; }
+
+  /* ===== PWA 설치 배너 ===== */
+  #pwa-banner {
+    position: fixed; left: 12px; right: 12px; bottom: -100px; z-index: 2000;
+    background: linear-gradient(135deg, #ec4899, #6366f1); color: #fff;
+    padding: 14px 16px; border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(236, 72, 153, 0.4);
+    display: flex; align-items: center; gap: 12px;
+    transition: bottom .4s cubic-bezier(0.16, 1, 0.3, 1);
+    max-width: 500px; margin: 0 auto;
+  }
+  #pwa-banner.show { bottom: 20px; }
+  #pwa-banner .pwa-icon { font-size: 32px; flex-shrink: 0; }
+  #pwa-banner .pwa-msg { flex: 1; font-size: 13px; line-height: 1.4; font-weight: 500; }
+  #pwa-banner .pwa-msg b { display: block; font-size: 14px; margin-bottom: 2px; }
+  #pwa-banner button {
+    border: 0; cursor: pointer; padding: 8px 14px; border-radius: 8px;
+    font-weight: 700; font-size: 13px;
+  }
+  #pwa-banner .pwa-install-btn, #pwa-banner .pwa-ios-help {
+    background: #fff; color: #ec4899;
+  }
+  #pwa-banner .pwa-close-btn {
+    background: rgba(255,255,255,0.2); color: #fff; padding: 6px 10px; font-size: 12px;
+  }
+  @media (max-width: 400px) {
+    #pwa-banner .pwa-icon { display: none; }
+  }
+
+  /* iOS 안내 모달 */
+  #pwa-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  #pwa-backdrop.open { opacity: 1; pointer-events: auto; }
+  #pwa-ios-modal {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, calc(-50% + 20px));
+    width: 92%; max-width: 380px; background: #fff; border-radius: 16px; padding: 20px;
+    z-index: 2600; box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+  }
+  #pwa-ios-modal.open { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%); }
+  #pwa-ios-modal h3 { margin: 0 0 12px; font-size: 17px; }
+  #pwa-ios-modal ol { margin: 0 0 16px; padding-left: 20px; font-size: 14px; line-height: 1.8; color: #334155; }
+  #pwa-ios-modal ol b { color: #ec4899; }
+  #pwa-ios-modal button {
+    width: 100%; padding: 12px; border: 0; border-radius: 8px;
+    background: #111827; color: #fff; font-weight: 600; font-size: 14px; cursor: pointer;
+  }
   .spot-empty { padding: 32px 16px; text-align: center; color: #94a3b8; font-size: 13px; line-height: 1.6; }
 
   /* ===== 초보자 팁 패널 (좌측 고정, 모바일에서는 접힘) ===== */
@@ -336,6 +395,29 @@
 <div id="controls">
   <button id="locate">📍 내 위치</button>
   <button id="simulate" class="ghost">🧪 위치 시뮬레이션</button>
+</div>
+
+<!-- PWA 설치 배너 -->
+<div id="pwa-banner" role="dialog" aria-label="앱 설치 안내">
+  <div class="pwa-icon">🚁</div>
+  <div class="pwa-msg">
+    <b>홈 화면에 추가하기</b>
+    앱처럼 빠르게 열고, 오프라인에서도 열려요
+  </div>
+  <button id="pwa-install" class="pwa-install-btn" style="display:none;">📥 설치</button>
+  <button id="pwa-ios-help" class="pwa-ios-help" style="display:none;">방법 보기</button>
+  <button id="pwa-close" class="pwa-close-btn" aria-label="닫기">✕</button>
+</div>
+
+<div id="pwa-backdrop"></div>
+<div id="pwa-ios-modal" role="dialog" aria-label="iOS 설치 방법">
+  <h3>📱 홈 화면에 추가하는 방법</h3>
+  <ol>
+    <li>Safari 하단의 <b>공유 버튼</b> (□↑) 탭</li>
+    <li>메뉴에서 <b>"홈 화면에 추가"</b> 선택</li>
+    <li>우측 상단 <b>"추가"</b> 탭</li>
+  </ol>
+  <button id="pwa-ios-modal-close">확인</button>
 </div>
 
 <aside id="tips" aria-label="초보자 팁">
@@ -773,5 +855,6 @@
 </script>
 <script src="checklist.js"></script>
 <script src="spots.js"></script>
+<script src="pwa.js"></script>
 </body>
 </html>

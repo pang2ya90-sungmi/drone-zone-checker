@@ -1,0 +1,38 @@
+{
+  "name": "드론 비행 구역 체커",
+  "short_name": "드론체커",
+  "description": "실시간 GPS로 드론 비행 가능 구역을 확인하고, 나만의 촬영 스팟을 저장·공유하는 앱",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#111827",
+  "theme_color": "#ec4899",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "내 위치 확인",
+      "url": "./?locate=1",
+      "description": "지금 있는 곳이 비행 가능 구역인지 확인"
+    },
+    {
+      "name": "스팟 추가",
+      "url": "./?addspot=1",
+      "description": "드론 촬영 스팟 저장"
+    }
+  ]
+}
