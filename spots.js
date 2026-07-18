@@ -160,12 +160,12 @@ function exitAddMode() {
   document.getElementById('spot-add').classList.remove('active');
 }
 
-function openSpotForm(lat, lng) {
+function openSpotForm(lat, lng, prefillName = '') {
   document.getElementById('spot-form').classList.add('open');
   document.getElementById('spot-backdrop').classList.add('open');
   document.getElementById('spot-lat').value = lat;
   document.getElementById('spot-lng').value = lng;
-  document.getElementById('spot-name').value = '';
+  document.getElementById('spot-name').value = prefillName || '';
   document.getElementById('spot-desc').value = '';
   document.getElementById('spot-rating').value = 5;
   document.getElementById('spot-photo').value = '';
@@ -175,6 +175,7 @@ function openSpotForm(lat, lng) {
   const warn = zoneWarningFor(lat, lng);
   document.getElementById('spot-form-warn').innerHTML = warn;
 }
+window.openSpotForm = openSpotForm;
 function closeSpotForm() {
   document.getElementById('spot-form').classList.remove('open');
   document.getElementById('spot-backdrop').classList.remove('open');
@@ -239,8 +240,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // 버튼/이벤트
   document.getElementById('spot-add').addEventListener('click', () => {
-    if (addMode) exitAddMode();
-    else enterAddMode();
+    if (addMode) { exitAddMode(); return; }
+    // 검색으로 지도에 뜬 결과가 있으면 그 위치로 바로 폼 오픈
+    const s = window.lastSearchResult;
+    if (s) {
+      openSpotForm(s.lat, s.lng, s.label);
+      return;
+    }
+    enterAddMode();
   });
   document.getElementById('spot-panel-open').addEventListener('click', openSpotPanel);
   document.getElementById('spot-panel-close').addEventListener('click', closeSpotPanel);
@@ -257,11 +264,19 @@ window.addEventListener('DOMContentLoaded', () => {
     pv.innerHTML = `<img src="${dataUrl}" alt="preview">`;
   });
 
-  // 팝업 안의 삭제 버튼 이벤트 위임
+  // 팝업 안의 삭제/저장 버튼 이벤트 위임
   document.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action="delete-spot"]');
-    if (btn) {
-      deleteSpot(btn.dataset.id);
+    const del = e.target.closest('[data-action="delete-spot"]');
+    if (del) { deleteSpot(del.dataset.id); return; }
+
+    const save = e.target.closest('[data-action="save-search-as-spot"]');
+    if (save) {
+      const lat = parseFloat(save.dataset.lat);
+      const lng = parseFloat(save.dataset.lng);
+      const label = save.dataset.label || '';
+      // 열려있던 검색 팝업 닫고 폼 오픈
+      if (window.mapRef) window.mapRef.closePopup();
+      openSpotForm(lat, lng, label);
     }
   });
 

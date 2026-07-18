@@ -445,6 +445,12 @@
   // 비어있으면 zones는 샘플, 검색은 Nominatim으로 폴백.
   window.ZONES_PROXY_URL = "";  // 예: "https://drone-zone-proxy.<username>.workers.dev"
   window.SEARCH_PROXY_URL = window.ZONES_PROXY_URL; // 같은 Worker 사용
+
+  // 로컬 개발 편의: localhost로 열면 로컬 wrangler dev(8787) 자동 사용
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    if (!window.SEARCH_PROXY_URL) window.SEARCH_PROXY_URL = 'http://localhost:8787';
+    if (!window.ZONES_PROXY_URL) window.ZONES_PROXY_URL = 'http://localhost:8787';
+  }
 </script>
 <script src="zones.js"></script>
 <script>
@@ -613,6 +619,8 @@
     if (searchMarker) map.removeLayer(searchMarker);
     const v = zoneVerdict(lat, lng);
     searchMarker = L.marker([lat, lng]).addTo(map);
+    // spots.js가 참조할 수 있게 전역에 노출
+    window.lastSearchResult = { lat, lng, label };
     const body = v.names.length
       ? `<div style="margin-top:6px;font-size:12px;color:#475569;">해당 구역: ${v.names.join(', ')}</div>`
       : `<div style="margin-top:6px;font-size:12px;color:#475569;">샘플 데이터 기준 알려진 금지/제한 구역에 포함되지 않음</div>`;
@@ -624,6 +632,12 @@
         </div>
         ${body}
         <div style="margin-top:8px;font-size:11px;color:#94a3b8;">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+        <button
+          data-action="save-search-as-spot"
+          data-lat="${lat}" data-lng="${lng}" data-label="${label.replace(/"/g, '&quot;')}"
+          style="margin-top:10px;width:100%;padding:8px;border:0;border-radius:6px;background:#ec4899;color:#fff;font-weight:600;font-size:13px;cursor:pointer;">
+          📸 이 위치를 스팟으로 저장
+        </button>
       </div>`;
     searchMarker.bindPopup(html, { maxWidth: 280 }).openPopup();
     map.setView([lat, lng], Math.max(map.getZoom(), 14));
@@ -689,8 +703,13 @@
   document.getElementById('q').addEventListener('keydown', e => {
     if (e.key === 'Enter') runSearch(e.target.value);
   });
-  // 지도 클릭 시 결과 리스트 닫기
-  map.on('click', () => { document.getElementById('results').style.display = 'none'; });
+  // 지도 클릭 시 결과 리스트 닫고 검색 컨텍스트 리셋
+  map.on('click', () => {
+    document.getElementById('results').style.display = 'none';
+    if (searchMarker && !map.hasLayer(searchMarker)) {
+      window.lastSearchResult = null;
+    }
+  });
 
   // 처음 로드 시 자동으로 위치 요청
   startWatch();
