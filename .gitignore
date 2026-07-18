@@ -2,6 +2,16 @@
 node_modules/
 .env
 .env.local
+.env.*.local
 *.log
 .vscode/
 .idea/
+
+# Cloudflare Wrangler
+.dev.vars
+.wrangler/
+worker/.dev.vars
+worker/.wrangler/
+
+# 로컬 시크릿 (혹시 만들 경우)
+secrets.local.json

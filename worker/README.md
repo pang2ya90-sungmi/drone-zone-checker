@@ -35,10 +35,21 @@ npm run deploy
   - 응답: `[{lat, lon, place_name, address, category, phone, display_name}]`
 
 ## 로컬 테스트
+
+시크릿은 `.dev.vars` (git에 커밋 안 됨) 에서 읽습니다.
+
 ```bash
+cp .dev.vars.example .dev.vars     # 처음 한 번만
+# .dev.vars 열어서 실제 키 값 채우기
 npx wrangler dev
+# → http://localhost:8787/search?q=통통통놀이터
 # → http://localhost:8787/zones
 ```
+
+## 키 관리 규칙
+- 커밋 금지: `.dev.vars`, `.env` (모두 `.gitignore` 처리됨)
+- 프로덕션 시크릿은 Cloudflare가 관리 → `npx wrangler secret put KAKAO_KEY`
+- 노출됐다 싶으면 즉시 Kakao/V-World 콘솔에서 **재발급(Regenerate)**
 
 ## 캐싱
 Cloudflare edge cache로 1시간 유지. 데이터가 자주 바뀌지 않는 특성 반영.
