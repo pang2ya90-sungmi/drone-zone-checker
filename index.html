@@ -238,7 +238,13 @@
   }
   .spot-row-body { flex: 1; min-width: 0; }
   .spot-row-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .spot-row-sub { font-size: 12px; color: #64748b; }
+  .spot-row-sub { font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 6px; }
+  .spot-row-kind {
+    display: inline-block; padding: 1px 6px; border-radius: 4px;
+    font-size: 10px; font-weight: 600;
+  }
+  .spot-row-kind.personal { background: #fdf2f8; color: #be185d; }
+  .spot-row-kind.community { background: #eef2ff; color: #4338ca; }
   .spot-empty { padding: 32px 16px; text-align: center; color: #94a3b8; font-size: 13px; line-height: 1.6; }
 
   /* ===== 초보자 팁 패널 (좌측 고정, 모바일에서는 접힘) ===== */
