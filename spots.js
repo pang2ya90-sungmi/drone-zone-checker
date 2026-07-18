@@ -134,6 +134,7 @@ async function fetchCommunitySpots() {
       isCommunity: true,
     }));
     if (window.mapRef) renderCommunitySpots(window.mapRef);
+    renderSpotList();
   } catch (e) {
     console.warn('[community spots] fetch failed:', e.message);
   }
@@ -185,28 +186,46 @@ function zoneWarningFor(lat, lng) {
 function renderSpotList() {
   const el = document.getElementById('spot-list');
   if (!el) return;
-  const spots = loadSpots().sort((a, b) => (b.rating || 0) - (a.rating || 0) || b.createdAt.localeCompare(a.createdAt));
+
+  // 개인 스팟 + 내가 올린 커뮤니티 스팟을 합쳐서 표시
+  const myIds = loadMyCommunityIds();
+  const personal = loadSpots().map(s => ({ ...s, _kind: 'personal', _sortKey: s.createdAt }));
+  const community = communitySpotsCache
+    .filter(s => myIds.includes(s.id))
+    .map(s => ({ ...s, _kind: 'community', _sortKey: s.created_at }));
+
+  const spots = [...personal, ...community]
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b._sortKey || '').localeCompare(a._sortKey || ''));
+
   if (!spots.length) {
     el.innerHTML = `<div class="spot-empty">저장된 스팟이 없어요.<br>지도에서 📸 버튼을 누르고 위치를 찍어보세요.</div>`;
     return;
   }
-  el.innerHTML = spots.map(s => `
-    <div class="spot-row" data-id="${s.id}">
-      ${s.photo ? `<img src="${s.photo}" class="spot-thumb">` : `<div class="spot-thumb-blank">📸</div>`}
-      <div class="spot-row-body">
-        <div class="spot-row-name">${escapeHtml(s.name)}</div>
-        <div class="spot-row-sub">${s.rating ? '⭐'.repeat(s.rating) : ''} · ${new Date(s.createdAt).toLocaleDateString('ko-KR')}</div>
-      </div>
-    </div>`).join('');
+  el.innerHTML = spots.map(s => {
+    const dateStr = s._sortKey ? new Date(s._sortKey).toLocaleDateString('ko-KR') : '';
+    const kindBadge = s._kind === 'community'
+      ? '<span class="spot-row-kind community">👥 공유</span>'
+      : '<span class="spot-row-kind personal">🔒 개인</span>';
+    return `
+      <div class="spot-row" data-id="${s.id}" data-kind="${s._kind}">
+        ${s.photo ? `<img src="${s.photo}" class="spot-thumb">` : `<div class="spot-thumb-blank">📸</div>`}
+        <div class="spot-row-body">
+          <div class="spot-row-name">${escapeHtml(s.name)}</div>
+          <div class="spot-row-sub">${kindBadge} ${s.rating ? '⭐'.repeat(s.rating) : ''} · ${dateStr}</div>
+        </div>
+      </div>`;
+  }).join('');
 
   el.querySelectorAll('.spot-row').forEach(row => {
     row.addEventListener('click', () => {
       const id = row.dataset.id;
-      const s = loadSpots().find(x => x.id === id);
+      const kind = row.dataset.kind;
+      const source = kind === 'community' ? communitySpotsCache : loadSpots();
+      const layer = kind === 'community' ? communityLayer : spotLayer;
+      const s = source.find(x => x.id === id);
       if (s) {
         window.mapRef.setView([s.lat, s.lng], 15);
-        // 팝업 열기: 해당 마커 찾기
-        spotLayer.eachLayer(m => {
+        layer?.eachLayer(m => {
           const ll = m.getLatLng();
           if (Math.abs(ll.lat - s.lat) < 1e-9 && Math.abs(ll.lng - s.lng) < 1e-9) m.openPopup();
         });
