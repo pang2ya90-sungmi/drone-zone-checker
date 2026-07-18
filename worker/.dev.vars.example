@@ -1,0 +1,11 @@
+# 팀원용 템플릿. 이 파일은 git에 커밋됩니다.
+# 이 파일을 `.dev.vars`로 복사해서 실제 값을 채우세요.
+#
+#   cp .dev.vars.example .dev.vars
+#
+# `.dev.vars`는 .gitignore에 등록되어 커밋되지 않습니다.
+
+KAKAO_KEY=your_kakao_rest_api_key_here
+VWORLD_KEY=your_vworld_api_key_here
+# 선택: V-World 키에 도메인 제한이 걸려있을 때
+# VWORLD_DOMAIN=https://pang2ya90-sungmi.github.io
