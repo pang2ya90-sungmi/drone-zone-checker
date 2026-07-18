@@ -59,6 +59,63 @@
   .legend .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
   .legend .swatch { width: 14px; height: 14px; border-radius: 3px; }
   .legend #data-source { margin-top: 6px; padding-top: 6px; border-top: 1px solid #eef; color: #64748b; font-size: 11px; }
+
+  /* ===== 체크리스트 FAB + 바텀시트 ===== */
+  #cl-open {
+    position: absolute; right: 12px; bottom: 78px; z-index: 1001;
+    width: 60px; height: 60px; border-radius: 50%; border: 0;
+    background: #111827; color: #fff; font-size: 24px; cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+  }
+  #cl-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1500;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  #cl-backdrop.open { opacity: 1; pointer-events: auto; }
+  #cl-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1600;
+    background: #fff; border-radius: 20px 20px 0 0;
+    max-height: 85vh; overflow: auto;
+    transform: translateY(100%); transition: transform .3s ease;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.2);
+  }
+  #cl-sheet.open { transform: translateY(0); }
+  #cl-header {
+    position: sticky; top: 0; background: #fff; padding: 14px 16px 10px;
+    border-bottom: 1px solid #eef; z-index: 2;
+  }
+  #cl-header .bar { width: 40px; height: 4px; background: #cbd5e1; border-radius: 2px; margin: 0 auto 10px; }
+  #cl-header .row { display: flex; justify-content: space-between; align-items: center; }
+  #cl-header h2 { margin: 0; font-size: 18px; }
+  #cl-summary { margin-top: 6px; font-size: 13px; }
+  #cl-header button { border: 0; background: transparent; font-size: 20px; cursor: pointer; padding: 4px 8px; }
+  #cl-body { padding: 10px 16px 24px; }
+  .cl-group { margin-bottom: 18px; }
+  .cl-group h3 { margin: 12px 0 4px; font-size: 15px; }
+  .cl-desc { margin: 0 0 8px; font-size: 12px; color: #64748b; }
+  .cl-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 8px; border-radius: 8px; font-size: 14px;
+  }
+  .cl-item.clickable { cursor: pointer; }
+  .cl-item.clickable:active { background: #f1f5f9; }
+  .cl-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; color: #fff; font-size: 14px; flex-shrink: 0;
+  }
+  .cl-label { flex: 1; line-height: 1.4; }
+  .cl-hint { display: block; font-size: 11px; color: #64748b; margin-top: 2px; }
+  .cl-item input[type=checkbox] { width: 20px; height: 20px; accent-color: #10b981; flex-shrink: 0; }
+  #cl-footer {
+    position: sticky; bottom: 0; background: #fff; padding: 12px 16px;
+    border-top: 1px solid #eef; display: flex; gap: 8px;
+  }
+  #cl-footer a, #cl-footer button {
+    flex: 1; padding: 12px; border-radius: 10px; border: 0;
+    font-weight: 600; font-size: 14px; text-align: center; text-decoration: none; cursor: pointer;
+  }
+  #cl-reset { background: #f1f5f9; color: #475569; }
+  #cl-onestop { background: #111827; color: #fff; }
 </style>
 </head>
 <body>
@@ -79,6 +136,24 @@
   <button id="locate">📍 내 위치</button>
   <button id="simulate" class="ghost">🧪 위치 시뮬레이션</button>
 </div>
+
+<button id="cl-open" title="비행 전 체크리스트">✈️</button>
+<div id="cl-backdrop"></div>
+<aside id="cl-sheet" aria-label="비행 전 체크리스트">
+  <div id="cl-header">
+    <div class="bar"></div>
+    <div class="row">
+      <h2>비행 전 체크리스트</h2>
+      <button id="cl-close" aria-label="닫기">✕</button>
+    </div>
+    <div id="cl-summary"></div>
+  </div>
+  <div id="cl-body"></div>
+  <div id="cl-footer">
+    <button id="cl-reset">🔄 초기화</button>
+    <a id="cl-onestop" href="https://drone.onestop.go.kr" target="_blank" rel="noopener">📝 드론 원스톱 신청</a>
+  </div>
+</aside>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -176,10 +251,14 @@
     }
   }
 
+  // checklist.js에서 참조할 수 있도록 전역에 노출
+  window.pointInPolygon = pointInPolygon;
+
   function setMe(lat, lng, accuracy) {
     const latlng = [lat, lng];
     if (!meMarker) {
       meMarker = L.circleMarker(latlng, { radius: 8, color: '#fff', weight: 2, fillColor: '#3b82f6', fillOpacity: 1 }).addTo(map);
+      window.meMarkerRef = meMarker;
     } else meMarker.setLatLng(latlng);
     if (accuracy) {
       if (!meCircle) meCircle = L.circle(latlng, { radius: accuracy, color: '#3b82f6', fillOpacity: 0.1, weight: 1 }).addTo(map);
@@ -312,5 +391,6 @@
   // 처음 로드 시 자동으로 위치 요청
   startWatch();
 </script>
+<script src="checklist.js"></script>
 </body>
 </html>
