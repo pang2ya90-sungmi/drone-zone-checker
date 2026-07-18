@@ -23,7 +23,9 @@ function corsHeaders(origin) {
   const allow = origin && ALLOWED_ORIGIN.test(origin) ? origin : '*';
   return {
     'Access-Control-Allow-Origin': allow,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
   };
 }
@@ -86,6 +88,118 @@ async function kakaoSearch(env, query, opts = {}) {
   }));
 }
 
+// ================== 커뮤니티 스팟 ==================
+// 로그인 없이 익명 토큰으로 자기 스팟만 삭제 가능
+// 신고 3회 누적 시 자동 숨김
+
+const jsonRes = (data, opts = {}) => new Response(JSON.stringify(data), {
+  status: opts.status || 200,
+  headers: {
+    'Content-Type': 'application/json; charset=utf-8',
+    ...(opts.headers || {}),
+  },
+});
+
+// 간단한 금칙어 (오·남용 최소 방어. 완벽하지 않음)
+const BLOCKED_WORDS = ['씨발', '병신', 'fuck', 'shit', '개새'];
+function containsBlocked(text) {
+  const t = (text || '').toLowerCase();
+  return BLOCKED_WORDS.some(w => t.includes(w));
+}
+
+async function handleSpots(url, request, env, cors) {
+  const parts = url.pathname.split('/').filter(Boolean); // ["spots"] or ["spots", ID] or ["spots", ID, "report"]
+  const method = request.method;
+
+  try {
+    // GET /spots  → 목록
+    if (parts.length === 1 && method === 'GET') {
+      const rows = await env.DB.prepare(
+        `SELECT id, lat, lng, name, descr, rating, author_name, created_at, reports
+         FROM spots
+         WHERE hidden = 0
+         ORDER BY created_at DESC
+         LIMIT 500`
+      ).all();
+      return jsonRes({ spots: rows.results || [] }, { headers: cors });
+    }
+
+    // POST /spots  → 생성
+    if (parts.length === 1 && method === 'POST') {
+      const body = await request.json();
+      const { lat, lng, name, desc = '', rating = 0, author_name = '익명', author_token } = body;
+      if (typeof lat !== 'number' || typeof lng !== 'number' || !name || !author_token) {
+        return jsonRes({ error: 'lat/lng/name/author_token 필요' }, { status: 400, headers: cors });
+      }
+      if (name.length > 100 || desc.length > 500 || author_name.length > 30) {
+        return jsonRes({ error: '입력 길이 초과' }, { status: 400, headers: cors });
+      }
+      if (containsBlocked(name) || containsBlocked(desc) || containsBlocked(author_name)) {
+        return jsonRes({ error: '부적절한 표현 포함' }, { status: 400, headers: cors });
+      }
+      // 레이트 리밋: 같은 토큰이 1분 안에 5개 초과 저장 방지
+      const rate = await env.DB.prepare(
+        `SELECT COUNT(*) AS c FROM spots WHERE author_token = ? AND created_at > datetime('now', '-1 minute')`
+      ).bind(author_token).first();
+      if ((rate?.c || 0) >= 5) {
+        return jsonRes({ error: '잠시 후 다시 시도해주세요 (분당 5개 제한)' }, { status: 429, headers: cors });
+      }
+
+      const id = `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+      const createdAt = new Date().toISOString();
+      await env.DB.prepare(
+        `INSERT INTO spots (id, lat, lng, name, descr, rating, author_name, author_token, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(id, lat, lng, name.trim(), (desc || '').trim(), rating, (author_name || '익명').trim(), author_token, createdAt).run();
+      return jsonRes({ id, created_at: createdAt }, { status: 201, headers: cors });
+    }
+
+    // DELETE /spots/:id?token=xxx
+    if (parts.length === 2 && method === 'DELETE') {
+      const id = parts[1];
+      const token = url.searchParams.get('token');
+      if (!token) return jsonRes({ error: 'token 필요' }, { status: 400, headers: cors });
+      const row = await env.DB.prepare(`SELECT author_token FROM spots WHERE id = ?`).bind(id).first();
+      if (!row) return jsonRes({ error: 'not found' }, { status: 404, headers: cors });
+      if (row.author_token !== token) return jsonRes({ error: '본인만 삭제 가능' }, { status: 403, headers: cors });
+      await env.DB.prepare(`DELETE FROM spots WHERE id = ?`).bind(id).run();
+      return jsonRes({ ok: true }, { headers: cors });
+    }
+
+    // POST /spots/:id/report  { token }
+    if (parts.length === 3 && parts[2] === 'report' && method === 'POST') {
+      const id = parts[1];
+      const body = await request.json().catch(() => ({}));
+      const token = body.token;
+      if (!token) return jsonRes({ error: 'token 필요' }, { status: 400, headers: cors });
+
+      const spot = await env.DB.prepare(`SELECT author_token FROM spots WHERE id = ?`).bind(id).first();
+      if (!spot) return jsonRes({ error: 'not found' }, { status: 404, headers: cors });
+      if (spot.author_token === token) return jsonRes({ error: '자기 스팟은 신고 불가' }, { status: 400, headers: cors });
+
+      try {
+        await env.DB.prepare(
+          `INSERT INTO reports (spot_id, reporter_token, created_at) VALUES (?, ?, ?)`
+        ).bind(id, token, new Date().toISOString()).run();
+      } catch { /* 중복 신고 무시 */ }
+
+      const cnt = await env.DB.prepare(`SELECT COUNT(*) AS c FROM reports WHERE spot_id = ?`).bind(id).first();
+      const total = cnt?.c || 0;
+      const hidden = total >= 3;
+      if (hidden) {
+        await env.DB.prepare(`UPDATE spots SET hidden = 1, reports = ? WHERE id = ?`).bind(total, id).run();
+      } else {
+        await env.DB.prepare(`UPDATE spots SET reports = ? WHERE id = ?`).bind(total, id).run();
+      }
+      return jsonRes({ reports: total, hidden }, { headers: cors });
+    }
+
+    return jsonRes({ error: 'Not Found' }, { status: 404, headers: cors });
+  } catch (e) {
+    return jsonRes({ error: e.message }, { status: 500, headers: cors });
+  }
+}
+
 // V-World GeoJSON → 앱 통일 스키마로 정규화
 function normalize(fc, kind) {
   if (!fc || !fc.features) return { type: 'FeatureCollection', features: [] };
@@ -118,6 +232,11 @@ export default {
     //   /search?q=...        → Kakao 로컬 검색 결과
     if (url.pathname === '/health') {
       return new Response('ok', { headers: cors });
+    }
+
+    // ---------- 커뮤니티 스팟 (D1) ----------
+    if (url.pathname === '/spots' || url.pathname.startsWith('/spots/')) {
+      return await handleSpots(url, request, env, cors);
     }
 
     if (url.pathname === '/search') {
