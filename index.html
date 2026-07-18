@@ -117,6 +117,123 @@
   #cl-reset { background: #f1f5f9; color: #475569; }
   #cl-onestop { background: #111827; color: #fff; }
 
+  /* ===== 드론 촬영 스팟 ===== */
+  #spot-add {
+    position: absolute; right: 12px; bottom: 210px; z-index: 1001;
+    width: 60px; height: 60px; border-radius: 50%; border: 0;
+    background: #ec4899; color: #fff; font-size: 24px; cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+  }
+  #spot-add.active { background: #10b981; }
+  #spot-panel-open {
+    position: absolute; right: 12px; bottom: 144px; z-index: 1001;
+    width: 60px; height: 60px; border-radius: 50%; border: 0;
+    background: #fff; color: #111827; font-size: 22px; cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  }
+  body.add-spot-mode #map { cursor: crosshair; }
+  #spot-hint {
+    position: absolute; top: 130px; left: 50%; transform: translateX(-50%);
+    padding: 10px 16px; background: #10b981; color: #fff; border-radius: 20px;
+    z-index: 1000; font-size: 14px; font-weight: 600; opacity: 0;
+    pointer-events: none; transition: opacity .2s; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  #spot-hint.show { opacity: 1; }
+
+  /* 스팟 마커 */
+  .spot-marker-wrap { background: transparent !important; border: 0 !important; }
+  .spot-marker {
+    width: 36px; height: 36px; background: #ec4899; border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg); display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25); position: relative;
+    border: 2px solid #fff;
+  }
+  .spot-marker::before { content: ''; transform: rotate(45deg); font-size: 18px; }
+  .spot-marker { font-size: 0; }
+  .spot-marker > * { transform: rotate(45deg); font-size: 16px; }
+  .spot-star {
+    position: absolute; top: -8px; right: -8px; font-size: 12px;
+    transform: rotate(45deg);
+  }
+
+  /* 팝업 */
+  .spot-popup .spot-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .spot-popup .spot-rating { color: #f59e0b; margin-bottom: 6px; }
+  .spot-popup .spot-photo { width: 100%; border-radius: 8px; margin: 6px 0; }
+  .spot-popup .spot-desc { font-size: 13px; color: #334155; margin: 4px 0; white-space: pre-wrap; }
+  .spot-popup .spot-warn { padding: 6px 8px; border-radius: 6px; font-size: 12px; margin: 6px 0; font-weight: 600; }
+  .spot-popup .spot-warn.danger { background: #fee2e2; color: #991b1b; }
+  .spot-popup .spot-warn.warn { background: #fef3c7; color: #92400e; }
+  .spot-popup .spot-meta { font-size: 11px; color: #94a3b8; margin-top: 6px; }
+  .spot-popup .spot-actions { margin-top: 8px; }
+  .spot-popup .spot-actions button {
+    padding: 6px 10px; border: 1px solid #fecaca; background: #fff; color: #b91c1c;
+    border-radius: 6px; font-size: 12px; cursor: pointer;
+  }
+
+  /* 스팟 폼 (모달) */
+  #spot-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1700;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  #spot-backdrop.open { opacity: 1; pointer-events: auto; }
+  #spot-form {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, calc(-50% + 20px));
+    width: 92%; max-width: 420px; background: #fff; border-radius: 16px;
+    z-index: 1800; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+    max-height: 90vh; overflow: auto;
+  }
+  #spot-form.open { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%); }
+  #spot-form h3 { margin: 0 0 12px; font-size: 17px; }
+  #spot-form label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin: 10px 0 4px; }
+  #spot-form input[type=text], #spot-form textarea, #spot-form select {
+    width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+    font-size: 14px; font-family: inherit; outline: none;
+  }
+  #spot-form textarea { min-height: 60px; resize: vertical; }
+  #spot-form input[type=file] { font-size: 12px; }
+  #spot-photo-preview img { max-width: 100%; border-radius: 8px; margin-top: 6px; }
+  #spot-form-warn:not(:empty) {
+    padding: 8px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin: 10px 0 0;
+  }
+  #spot-form-warn .spot-warn.danger { background: #fee2e2; color: #991b1b; padding: 8px 10px; border-radius: 6px; }
+  #spot-form-warn .spot-warn.warn { background: #fef3c7; color: #92400e; padding: 8px 10px; border-radius: 6px; }
+  #spot-form .form-buttons { display: flex; gap: 8px; margin-top: 16px; }
+  #spot-form .form-buttons button {
+    flex: 1; padding: 12px; border: 0; border-radius: 8px;
+    font-weight: 600; font-size: 14px; cursor: pointer;
+  }
+  #spot-cancel { background: #f1f5f9; color: #475569; }
+  #spot-submit { background: #ec4899; color: #fff; }
+
+  /* 스팟 목록 사이드 시트 */
+  #spot-panel {
+    position: fixed; right: 0; top: 0; bottom: 0; width: 340px; max-width: 90vw;
+    background: #fff; z-index: 1500; box-shadow: -8px 0 30px rgba(0,0,0,0.15);
+    transform: translateX(100%); transition: transform .3s ease;
+    display: flex; flex-direction: column;
+  }
+  #spot-panel.open { transform: translateX(0); }
+  #spot-panel header {
+    padding: 14px 16px; border-bottom: 1px solid #eef;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #spot-panel header h3 { margin: 0; flex: 1; font-size: 16px; }
+  #spot-panel header button { border: 0; background: transparent; font-size: 20px; cursor: pointer; padding: 4px 8px; }
+  #spot-list { overflow: auto; padding: 8px 12px 20px; }
+  .spot-row { display: flex; gap: 10px; padding: 10px; border-radius: 10px; cursor: pointer; }
+  .spot-row:hover { background: #f8fafc; }
+  .spot-thumb, .spot-thumb-blank {
+    width: 60px; height: 60px; border-radius: 8px; flex-shrink: 0;
+    object-fit: cover; background: #f1f5f9;
+    display: flex; align-items: center; justify-content: center; font-size: 24px; color: #94a3b8;
+  }
+  .spot-row-body { flex: 1; min-width: 0; }
+  .spot-row-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .spot-row-sub { font-size: 12px; color: #64748b; }
+  .spot-empty { padding: 32px 16px; text-align: center; color: #94a3b8; font-size: 13px; line-height: 1.6; }
+
   /* ===== 초보자 팁 패널 (좌측 고정, 모바일에서는 접힘) ===== */
   #tips {
     position: absolute; left: 12px; top: 130px; bottom: 90px; width: 300px;
@@ -260,6 +377,50 @@
 
 <button id="tips-toggle" title="초보자 팁">💡</button>
 <button id="cl-open" title="비행 전 체크리스트">✈️</button>
+<button id="spot-add" title="드론 촬영 스팟 추가">📸</button>
+<button id="spot-panel-open" title="저장한 스팟 목록">📌</button>
+<div id="spot-hint">📍 지도에서 스팟 위치를 클릭하세요</div>
+
+<div id="spot-backdrop"></div>
+<form id="spot-form">
+  <h3>📸 드론 촬영 스팟 추가</h3>
+  <input type="hidden" id="spot-lat" />
+  <input type="hidden" id="spot-lng" />
+
+  <label for="spot-name">이름</label>
+  <input id="spot-name" type="text" placeholder="예: 여의도 벚꽃길 야경" required maxlength="60" />
+
+  <label for="spot-rating">별점</label>
+  <select id="spot-rating">
+    <option value="5">⭐⭐⭐⭐⭐ 최고</option>
+    <option value="4">⭐⭐⭐⭐ 훌륭</option>
+    <option value="3">⭐⭐⭐ 좋음</option>
+    <option value="2">⭐⭐ 무난</option>
+    <option value="1">⭐ 그냥그럼</option>
+  </select>
+
+  <label for="spot-desc">메모 (선택)</label>
+  <textarea id="spot-desc" placeholder="촬영 팁, 최적 시간대, 주차 정보 등" maxlength="500"></textarea>
+
+  <label for="spot-photo">사진 (선택)</label>
+  <input id="spot-photo" type="file" accept="image/*" />
+  <div id="spot-photo-preview"></div>
+
+  <div id="spot-form-warn"></div>
+
+  <div class="form-buttons">
+    <button type="button" id="spot-cancel">취소</button>
+    <button type="submit" id="spot-submit">저장</button>
+  </div>
+</form>
+
+<aside id="spot-panel">
+  <header>
+    <h3>📌 내 드론 스팟</h3>
+    <button id="spot-panel-close" aria-label="닫기">✕</button>
+  </header>
+  <div id="spot-list"></div>
+</aside>
 <div id="cl-backdrop"></div>
 <aside id="cl-sheet" aria-label="비행 전 체크리스트">
   <div id="cl-header">
@@ -286,6 +447,7 @@
 <script src="zones.js"></script>
 <script>
   const map = L.map('map', { zoomControl: true }).setView([36.5, 127.8], 7);
+  window.mapRef = map;
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -519,5 +681,6 @@
   document.getElementById('tips-close').addEventListener('click', () => tips.classList.remove('open'));
 </script>
 <script src="checklist.js"></script>
+<script src="spots.js"></script>
 </body>
 </html>
