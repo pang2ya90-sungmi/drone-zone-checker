@@ -441,8 +441,10 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   // Cloudflare Worker 배포 후 아래 URL 넣으세요.
-  // 비어있으면 zones.js 내장 샘플 데이터 사용.
-  window.ZONES_PROXY_URL = ""; // 예: "https://drone-zone-proxy.<username>.workers.dev"
+  // 하나로 구역 데이터(V-World)와 지명 검색(Kakao)을 모두 처리합니다.
+  // 비어있으면 zones는 샘플, 검색은 Nominatim으로 폴백.
+  window.ZONES_PROXY_URL = "";  // 예: "https://drone-zone-proxy.<username>.workers.dev"
+  window.SEARCH_PROXY_URL = window.ZONES_PROXY_URL; // 같은 Worker 사용
 </script>
 <script src="zones.js"></script>
 <script>
@@ -633,30 +635,48 @@
     box.style.display = 'block';
     box.innerHTML = `<div class="item">검색 중…</div>`;
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=ko&countrycodes=kr&q=${encodeURIComponent(q)}`;
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      const data = await res.json();
+      // Worker(카카오)가 설정돼 있으면 우선 사용, 아니면 Nominatim
+      let data;
+      if (window.SEARCH_PROXY_URL) {
+        const params = new URLSearchParams({ q });
+        if (meMarker) {
+          const ll = meMarker.getLatLng();
+          params.set('lat', ll.lat); params.set('lng', ll.lng);
+        }
+        const url = `${window.SEARCH_PROXY_URL.replace(/\/$/, '')}/search?${params}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`검색 프록시 오류 (${res.status})`);
+        data = await res.json();
+      } else {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=ko&countrycodes=kr&q=${encodeURIComponent(q)}`;
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        data = await res.json();
+      }
       if (!data.length) {
         box.innerHTML = `<div class="item">검색 결과가 없어요. 다른 키워드로 시도해보세요.</div>`;
         return;
       }
       box.innerHTML = data.map((r, i) => {
         const v = zoneVerdict(parseFloat(r.lat), parseFloat(r.lon));
+        const primary = r.place_name || r.display_name.split(',')[0];
+        const sub = r.address || r.display_name;
+        const cat = r.category ? `<span style="color:#94a3b8;font-size:11px;margin-left:4px;">${r.category.split('>').pop().trim()}</span>` : '';
         return `
           <div class="item" data-idx="${i}">
             <div>
               <span style="display:inline-block;padding:2px 8px;border-radius:6px;color:#fff;background:${v.color};font-size:12px;font-weight:600;margin-right:6px;">
                 ${v.icon} ${v.title}
               </span>
-              ${r.display_name.split(',').slice(0, 2).join(',')}
+              ${primary}${cat}
             </div>
-            <div class="sub">${r.display_name}</div>
+            <div class="sub">${sub}</div>
           </div>`;
       }).join('');
       box.querySelectorAll('.item').forEach(el => {
         el.addEventListener('click', () => {
           const r = data[parseInt(el.dataset.idx)];
-          showSearchResult(parseFloat(r.lat), parseFloat(r.lon), r.display_name.split(',')[0]);
+          const label = r.place_name || r.display_name.split(',')[0];
+          showSearchResult(parseFloat(r.lat), parseFloat(r.lon), label);
           box.style.display = 'none';
         });
       });

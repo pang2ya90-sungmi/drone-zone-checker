@@ -55,6 +55,37 @@ async function fetchLayer(env, layerKey, bboxParam) {
   return res.json();
 }
 
+// Kakao 로컬 검색 (POI 검색). 한국의 놀이터·카페·소상공인까지 잘 잡힘.
+// 참고: https://developers.kakao.com/docs/latest/ko/local/dev-guide
+async function kakaoSearch(env, query, opts = {}) {
+  const params = new URLSearchParams({
+    query,
+    size: String(opts.size || 15),
+  });
+  if (opts.lng && opts.lat) {
+    params.set('x', String(opts.lng));
+    params.set('y', String(opts.lat));
+    params.set('radius', String(opts.radius || 20000));
+  }
+  const res = await fetch(`https://dapi.kakao.com/v2/local/search/keyword.json?${params}`, {
+    headers: { Authorization: `KakaoAK ${env.KAKAO_KEY}` },
+    cf: { cacheTtl: 300, cacheEverything: true },
+  });
+  if (!res.ok) throw new Error(`Kakao ${res.status}`);
+  const data = await res.json();
+  // 앱 검색 UI가 쓰는 형태로 정규화 (lat/lon/display_name)
+  return (data.documents || []).map(d => ({
+    lat: d.y,
+    lon: d.x,
+    display_name: [d.place_name, d.road_address_name || d.address_name].filter(Boolean).join(', '),
+    place_name: d.place_name,
+    address: d.road_address_name || d.address_name || '',
+    category: d.category_name || '',
+    phone: d.phone || '',
+    source: 'kakao',
+  }));
+}
+
 // V-World GeoJSON → 앱 통일 스키마로 정규화
 function normalize(fc, kind) {
   if (!fc || !fc.features) return { type: 'FeatureCollection', features: [] };
@@ -80,16 +111,39 @@ export default {
       return new Response(null, { headers: cors });
     }
 
+    const url = new URL(request.url);
+    // 라우팅:
+    //   /health              → ok
+    //   /zones?bbox=...      → V-World 세 레이어 통합 GeoJSON
+    //   /search?q=...        → Kakao 로컬 검색 결과
+    if (url.pathname === '/health') {
+      return new Response('ok', { headers: cors });
+    }
+
+    if (url.pathname === '/search') {
+      if (!env.KAKAO_KEY) {
+        return new Response(JSON.stringify({ error: 'KAKAO_KEY not configured' }),
+          { status: 500, headers: { 'Content-Type': 'application/json', ...cors } });
+      }
+      const q = url.searchParams.get('q');
+      if (!q) return new Response('[]', { headers: { 'Content-Type': 'application/json', ...cors } });
+      try {
+        const results = await kakaoSearch(env, q, {
+          lat: url.searchParams.get('lat'),
+          lng: url.searchParams.get('lng'),
+        });
+        return new Response(JSON.stringify(results), {
+          headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...cors },
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }),
+          { status: 502, headers: { 'Content-Type': 'application/json', ...cors } });
+      }
+    }
+
     if (!env.VWORLD_KEY) {
       return new Response(JSON.stringify({ error: 'VWORLD_KEY not configured' }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...cors } });
-    }
-
-    const url = new URL(request.url);
-    // 라우팅: /zones?bbox=... → 세 레이어 합쳐서 반환
-    //         /health → ok
-    if (url.pathname === '/health') {
-      return new Response('ok', { headers: cors });
     }
 
     if (url.pathname === '/zones') {
