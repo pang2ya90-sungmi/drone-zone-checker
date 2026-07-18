@@ -255,6 +255,28 @@
   }
   .spot-row-kind.personal { background: #fdf2f8; color: #be185d; }
   .spot-row-kind.community { background: #eef2ff; color: #4338ca; }
+  .spot-row-kind.mine { background: #d1fae5; color: #065f46; }
+
+  /* 새로고침 버튼 (우측 상단) */
+  #refresh-btn {
+    position: absolute; top: 12px; right: 340px; z-index: 1000;
+    width: 42px; height: 42px; border: 0; border-radius: 50%;
+    background: #fff; color: #111827; font-size: 18px; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  #refresh-btn.spin { animation: rotate 0.8s linear infinite; }
+  @keyframes rotate { to { transform: rotate(360deg); } }
+  @media (max-width: 900px) {
+    #refresh-btn { top: 12px; right: 12px; }
+    #status { padding-right: 60px; }
+  }
+  #toast {
+    position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(30px);
+    background: rgba(17,24,39,0.95); color: #fff; padding: 10px 16px; border-radius: 20px;
+    font-size: 13px; z-index: 3000; opacity: 0; transition: opacity .2s, transform .2s;
+    pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .spot-row-del {
     border: 0; background: transparent; cursor: pointer; font-size: 18px;
     padding: 6px 8px; border-radius: 6px; color: #94a3b8; flex-shrink: 0;
@@ -374,6 +396,8 @@
 </head>
 <body>
 <div id="status"><span class="dot"></span><span id="status-text">위치 확인 중…</span></div>
+<button id="refresh-btn" title="서버에서 다시 불러오기">🔄</button>
+<div id="toast"></div>
 <div id="search">
   <input id="q" type="text" placeholder="장소 검색 (예: 한강공원 여의도, 남산타워)" autocomplete="off" />
   <button id="q-go">검색</button>
@@ -384,11 +408,11 @@
   <div class="row"><div class="swatch" style="background:#ef4444;"></div>비행금지구역</div>
   <div class="row"><div class="swatch" style="background:#f59e0b;"></div>비행제한/관제권</div>
   <div class="row"><div class="swatch" style="background:#3b82f6;"></div>내 위치</div>
-  <div class="row"><div class="swatch" style="background:#ec4899;"></div>내 스팟</div>
-  <div class="row"><div class="swatch" style="background:#6366f1;"></div>커뮤니티 스팟</div>
+  <div class="row"><div class="swatch" style="background:#ec4899;"></div>개인 스팟(로컬)</div>
+  <div class="row"><div class="swatch" style="background:#6366f1;"></div>등록 스팟(공유)</div>
   <label class="row" style="cursor:pointer;">
     <input id="show-community" type="checkbox" checked style="width:14px;height:14px;accent-color:#6366f1;" />
-    커뮤니티 표시
+    등록 스팟 표시
   </label>
   <div id="data-source">데이터 로딩…</div>
 </div>
@@ -485,7 +509,7 @@
 <button id="tips-toggle" title="초보자 팁">💡</button>
 <button id="cl-open" title="비행 전 체크리스트">✈️</button>
 <button id="spot-add" title="드론 촬영 스팟 추가">📸</button>
-<button id="spot-panel-open" title="저장한 스팟 목록">📌</button>
+<button id="spot-panel-open" title="등록된 드론 스팟">📌</button>
 <div id="spot-hint">📍 지도에서 스팟 위치를 클릭하세요</div>
 
 <div id="spot-backdrop"></div>
@@ -540,7 +564,7 @@
 
 <aside id="spot-panel">
   <header>
-    <h3>📌 내 드론 스팟</h3>
+    <h3>📌 등록된 드론 스팟</h3>
     <button id="spot-panel-close" aria-label="닫기">✕</button>
   </header>
   <div id="spot-list"></div>
@@ -847,6 +871,29 @@
 
   // 초기 상태: 위치 미확인. 사용자가 📍 버튼 눌러야 조회.
   document.getElementById('status-text').textContent = '📍 버튼을 누르면 현재 위치를 확인해요';
+
+  // 새로고침 버튼: 서버에서 등록 스팟 등을 다시 불러옴
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1800);
+  }
+  document.getElementById('refresh-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('refresh-btn');
+    btn.classList.add('spin');
+    btn.disabled = true;
+    try {
+      if (typeof fetchCommunitySpots === 'function') await fetchCommunitySpots();
+      // TODO: V-World 활성화되면 zones도 refetch
+      toast('✅ 최신 데이터로 업데이트했어요');
+    } catch (e) {
+      toast('⚠️ 새로고침 실패: ' + e.message);
+    } finally {
+      btn.classList.remove('spin');
+      btn.disabled = false;
+    }
+  });
 
   // 초보자 팁 패널 토글 (모바일에서만 의미 있음)
   const tips = document.getElementById('tips');
