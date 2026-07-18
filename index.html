@@ -245,6 +245,12 @@
   }
   .spot-row-kind.personal { background: #fdf2f8; color: #be185d; }
   .spot-row-kind.community { background: #eef2ff; color: #4338ca; }
+  .spot-row-del {
+    border: 0; background: transparent; cursor: pointer; font-size: 18px;
+    padding: 6px 8px; border-radius: 6px; color: #94a3b8; flex-shrink: 0;
+    align-self: center;
+  }
+  .spot-row-del:hover { background: #fef2f2; color: #b91c1c; }
   .spot-empty { padding: 32px 16px; text-align: center; color: #94a3b8; font-size: 13px; line-height: 1.6; }
 
   /* ===== 초보자 팁 패널 (좌측 고정, 모바일에서는 접힘) ===== */
@@ -595,25 +601,35 @@
     updateStatus(lat, lng);
   }
 
-  // ---- Geolocation ----
-  function startWatch() {
+  // ---- Geolocation (버튼 눌렀을 때만 1회 조회) ----
+  function locateOnce() {
     if (!navigator.geolocation) {
       document.getElementById('status-text').textContent = '이 브라우저는 위치 정보를 지원하지 않아요.';
       return;
     }
-    navigator.geolocation.watchPosition(
+    const btn = document.getElementById('locate');
+    const prev = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '📍 위치 확인 중…';
+    document.getElementById('status-text').textContent = '위치 확인 중…';
+
+    navigator.geolocation.getCurrentPosition(
       pos => {
         setMe(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
         map.setView([pos.coords.latitude, pos.coords.longitude], Math.max(map.getZoom(), 13));
+        btn.disabled = false;
+        btn.textContent = prev;
       },
       err => {
         document.getElementById('status-text').textContent = `위치 오류: ${err.message}`;
+        btn.disabled = false;
+        btn.textContent = prev;
       },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 60000, timeout: 15000 }
     );
   }
 
-  document.getElementById('locate').addEventListener('click', startWatch);
+  document.getElementById('locate').addEventListener('click', locateOnce);
 
   // 시뮬레이션: 지도 클릭 지점을 내 위치로 취급
   let simMode = false;
@@ -747,8 +763,8 @@
     }
   });
 
-  // 처음 로드 시 자동으로 위치 요청
-  startWatch();
+  // 초기 상태: 위치 미확인. 사용자가 📍 버튼 눌러야 조회.
+  document.getElementById('status-text').textContent = '📍 버튼을 누르면 현재 위치를 확인해요';
 
   // 초보자 팁 패널 토글 (모바일에서만 의미 있음)
   const tips = document.getElementById('tips');

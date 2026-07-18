@@ -213,11 +213,14 @@ function renderSpotList() {
           <div class="spot-row-name">${escapeHtml(s.name)}</div>
           <div class="spot-row-sub">${kindBadge} ${s.rating ? '⭐'.repeat(s.rating) : ''} · ${dateStr}</div>
         </div>
+        <button class="spot-row-del" data-action="row-delete" data-id="${s.id}" data-kind="${s._kind}" title="삭제">🗑️</button>
       </div>`;
   }).join('');
 
   el.querySelectorAll('.spot-row').forEach(row => {
-    row.addEventListener('click', () => {
+    row.addEventListener('click', (e) => {
+      // 삭제 버튼 클릭은 별도 처리 (버블링 차단)
+      if (e.target.closest('[data-action="row-delete"]')) return;
       const id = row.dataset.id;
       const kind = row.dataset.kind;
       const source = kind === 'community' ? communitySpotsCache : loadSpots();
@@ -421,6 +424,29 @@ window.addEventListener('DOMContentLoaded', () => {
       const label = save.dataset.label || '';
       if (window.mapRef) window.mapRef.closePopup();
       openSpotForm(lat, lng, label);
+      return;
+    }
+
+    const rowDel = e.target.closest('[data-action="row-delete"]');
+    if (rowDel) {
+      e.stopPropagation();
+      const id = rowDel.dataset.id;
+      const kind = rowDel.dataset.kind;
+      if (kind === 'community') {
+        if (!confirm('커뮤니티에서 이 스팟을 삭제할까요?')) return;
+        try {
+          const base = window.ZONES_PROXY_URL;
+          const res = await fetch(`${base.replace(/\/$/, '')}/spots/${encodeURIComponent(id)}?token=${encodeURIComponent(getAuthorToken())}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+          removeMyCommunityId(id);
+          await fetchCommunitySpots();
+        } catch (err) { alert('삭제 실패: ' + err.message); }
+      } else {
+        if (!confirm('이 스팟을 삭제할까요?')) return;
+        const remaining = loadSpots().filter(s => s.id !== id);
+        saveSpots(remaining);
+        renderSpots(window.mapRef);
+      }
       return;
     }
 
