@@ -277,6 +277,28 @@
     pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,0.25);
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ===== 새 버전 업데이트 배너 (Service Worker) ===== */
+  #update-banner {
+    position: fixed; top: -100px; left: 12px; right: 12px; z-index: 2400;
+    background: linear-gradient(135deg, #10b981, #059669); color: #fff;
+    padding: 12px 16px; border-radius: 12px;
+    display: flex; align-items: center; gap: 10px;
+    transition: top .35s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+    max-width: 500px; margin: 0 auto;
+  }
+  #update-banner.show { top: 12px; }
+  #update-banner .update-icon { font-size: 22px; flex-shrink: 0; }
+  #update-banner .update-msg { flex: 1; font-size: 13px; line-height: 1.4; font-weight: 600; }
+  #update-banner button {
+    border: 0; cursor: pointer; padding: 8px 14px; border-radius: 8px;
+    font-weight: 700; font-size: 13px;
+  }
+  #update-banner #update-apply { background: #fff; color: #059669; }
+  #update-banner #update-dismiss {
+    background: rgba(255,255,255,0.2); color: #fff; padding: 6px 10px;
+  }
   .spot-row-del {
     border: 0; background: transparent; cursor: pointer; font-size: 18px;
     padding: 6px 8px; border-radius: 6px; color: #94a3b8; flex-shrink: 0;
@@ -419,6 +441,14 @@
 <div id="controls">
   <button id="locate">📍 내 위치</button>
   <button id="simulate" class="ghost">🧪 위치 시뮬레이션</button>
+</div>
+
+<!-- 새 버전 업데이트 배너 -->
+<div id="update-banner" role="dialog" aria-label="새 버전 안내">
+  <div class="update-icon">✨</div>
+  <div class="update-msg">새 버전이 준비됐어요</div>
+  <button id="update-apply">업데이트</button>
+  <button id="update-dismiss" aria-label="닫기">✕</button>
 </div>
 
 <!-- PWA 설치 배너 -->

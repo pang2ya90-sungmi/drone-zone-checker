@@ -80,3 +80,57 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pwa-ios-modal-close').addEventListener('click', hideIosGuide);
   document.getElementById('pwa-backdrop').addEventListener('click', hideIosGuide);
 });
+
+// ========== Service Worker: 새 버전 자동 감지 ==========
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('./service-worker.js');
+
+      // 즉시 한 번 업데이트 체크
+      reg.update().catch(() => {});
+      // 1시간마다 백그라운드 체크
+      setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+
+      // 새 SW가 설치되면 배너 표시
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if (!newSW) return;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateBanner(newSW);
+          }
+        });
+      });
+
+      // 이미 waiting 상태의 SW가 있다면 표시
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        showUpdateBanner(reg.waiting);
+      }
+
+      // 새 SW가 활성화되면 자동 리로드
+      let reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloading) return;
+        reloading = true;
+        location.reload();
+      });
+    } catch (e) {
+      console.warn('[sw] register failed:', e);
+    }
+  });
+}
+
+function showUpdateBanner(worker) {
+  const el = document.getElementById('update-banner');
+  if (!el) return;
+  el.classList.add('show');
+  const apply = document.getElementById('update-apply');
+  apply.onclick = () => {
+    apply.disabled = true;
+    apply.textContent = '적용 중…';
+    worker.postMessage('skipWaiting');
+    // controllerchange 이벤트가 발생하면 자동 리로드됨
+  };
+  document.getElementById('update-dismiss').onclick = () => el.classList.remove('show');
+}
